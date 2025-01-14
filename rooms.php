@@ -1,283 +1,290 @@
 <?php
-
-require('../inc/db_config.php');
-require('../inc/essentials.php');
+require('inc/essentials.php');
+require('inc/db_config.php');
 adminLogin();
 
 
-if(isset($_POST['add_room']))
-{
-   $features = filteration(json_decode($_POST['features']));
-   $facilities = filteration(json_decode($_POST['facilities']));
-
-   $frm_data = filteration($_POST);
-   $flag = 0;
-
-   $q1 = "INSERT INTO `rooms`(`name`, `area`, `price`, `quantity`, `adult`, `children`, `description`) VALUES (?,?,?,?,?,?,?)";
- 
-   $values = [$frm_data['name'],$frm_data['area'],$frm_data['price'],$frm_data['quantity'],$frm_data['adult'],$frm_data['children'],$frm_data['desc']];
-
-
-   if(insert($q1,$values,'siiiiis')){
-      $flag = 1;
-   }
-
-   $room_id = mysqli_insert_id($con);
-
-  
-   $q2 = "INSERT INTO `room_facilities`(`room_id`, `facilities_id`) VALUES (?,?)";
-
-   if($stmt = mysqli_prepare($con,$q2))
-   {
-      foreach($facilities as $f){
-         mysqli_stmt_bind_param($stmt,'ii',$room_id,$f);
-         mysqli_stmt_execute($stmt);
-      }
-      mysqli_stmt_close($stmt);
-   }
-   else{
-      $flag = 0;
-      die('query can not be prepared - insert');
-
-   }
-
-
-   $q3 = "INSERT INTO `room_features`(`room_id`, `features_id`) VALUES (?,?)";
-  
-
-   if($stmt = mysqli_prepare($con,$q3))
-   {
-      foreach($features as $f){
-         mysqli_stmt_bind_param($stmt,'ii',$room_id,$f);
-         mysqli_stmt_execute($stmt);
-      }
-      mysqli_stmt_close($stmt);
-   }
-   else{
-      $flag = 0;
-      die('query can not be prepared - insert');
-
-   }
-
-   if($flag){
-      echo 1;
-   }
-   else{
-      echo 0;
-   }
-}
-
-if(isset($_POST['get_all_rooms']))
-{
-   $res = selectAll('rooms');
-   $i=1;
-
-   $data = "";
-
-   while($row = mysqli_fetch_assoc($res))
-   {
-      if($row['status']==1){
-         $status = "<button onclick='toggle_status($row[id],0)' class='btn btn-dark btn-sm shadow-none'>active</button>";
-      }
-      else{
-         $status = "<button onclick='toggle_status($row[id],1)' class='btn btn-warning btn-sm shadow-none'>inactive</button>";
-
-      }
-
-
-      $data.="
-         <tr class='align-middle'>
-            <td>$i</td>
-            <td>$row[name]</td>
-            <td>$row[area] sq. ft.</td>
-            <td>
-               <span class='badge rounded-pill bg-light text-dark'>
-                  Adult: $row[adult]
-               </span><br>
-               <span class='badge rounded-pill bg-light text-dark'>
-                  Children: $row[children]
-               </span>
-            </td>
-            <td>৳$row[price]</td>
-            <td>$row[quantity]</td>
-            <td>$status</td>
-            <td>
-               <button type='button' onclick='edit_details($row[id])' class='btn btn-primary shadow-none btn-sm' data-bs-toggle='modal' data-bs-target='#edit-room'>
-                  <i class='bi bi-pencil-square'></i>
-               </button>
-             
-            </td>
-         </tr>
-      
-      ";
-      $i++;
-   }
-   echo $data;
-   
-}
-
-if(isset($_POST['get_room']))
-{
-   $frm_data = filteration($_POST);
-   $res1 = select("SELECT * FROM `rooms` WHERE `id`=?",[$frm_data['get_room']],'i');
-   $res2 = select("SELECT * FROM `room_features` WHERE `room_id`=?",[$frm_data['get_room']],'i');
-   $res3 = select("SELECT * FROM `room_facilities` WHERE `room_id`=?",[$frm_data['get_room']],'i');
-
-   $roomdata = mysqli_fetch_assoc($res1);
-   $features = [];
-   $facilities = [];
-   if(mysqli_num_rows($res2)>0){
-      while($row = mysqli_fetch_assoc($res2)){
-         array_push($features,$row['features_id']);
-      }
-   }
-
-   
-   if(mysqli_num_rows($res3)>0){
-      while($row = mysqli_fetch_assoc($res3)){
-         array_push($facilities,$row['facilities_id']);
-      }
-   }
-
-   $data = ["roomdata" => $roomdata, "features" => $features, "facilities" => $facilities];
-   $data = json_encode($data);
-   echo $data;
-}
-
-if(isset($_POST['edit_room']))
-{
-   $features = filteration(json_decode($_POST['features']));
-   $facilities = filteration(json_decode($_POST['facilities']));
-
-   $frm_data = filteration($_POST);
-   $flag = 0;
-
-   $q1 = "UPDATE `rooms` SET `name`=?, `area`=?,`price`=?,`quantity`=?,`adult`=?,`children`=?,`description`=? WHERE `id`=?";
-   $values = [$frm_data['name'],$frm_data['area'],$frm_data['price'],$frm_data['quantity'],$frm_data['adult'],$frm_data['children'],$frm_data['desc'],$frm_data['room_id']];
-
-   if(update($q1,$values,'siiiiisi')){
-      $flag = 1;
-   }
-
-   $del_features = delete("DELETE FROM `room_features` WHERE `room_id`=?",[$frm_data['room_id']],'i');
-   $del_facilities = delete("DELETE FROM `room_facilities` WHERE `room_id`=?",[$frm_data['room_id']],'i');
-   
-   if(!($del_facilities && $del_features)){
-      $flag = 0;
-   }
-   $q2 = "INSERT INTO `room_facilities`(`room_id`, `facilities_id`) VALUES (?,?)";
-
-   if($stmt = mysqli_prepare($con,$q2))
-   {
-      foreach($facilities as $f){
-         mysqli_stmt_bind_param($stmt,'ii',$frm_data['room_id'],$f);
-         mysqli_stmt_execute($stmt);
-      }
-      $flag = 1;
-      mysqli_stmt_close($stmt);
-   }
-   else{
-      $flag = 0;
-      die('query can not be prepared - insert');
-
-   }
-
-
-   $q3 = "INSERT INTO `room_features`(`room_id`, `features_id`) VALUES (?,?)";
-
-   if($stmt = mysqli_prepare($con,$q3))
-   {
-      foreach($features as $f){
-         mysqli_stmt_bind_param($stmt,'ii',$frm_data['room_id'],$f);
-         mysqli_stmt_execute($stmt);
-      }
-      $flag = 1;
-      mysqli_stmt_close($stmt);
-   }
- 
-   else{
-      $flag = 0;
-      die('query can not be prepared - insert');
-
-   }
-
-   if($flag){
-      echo 1;
-   }
-   else{
-      echo 0;
-   }
-
-}
-
-if(isset($_POST['toggle_status']))
-{
-   $frm_data = filteration($_POST);
-
-   $q = "UPDATE `rooms` SET `status`=? WHERE `id`=?";
-   $v = [$frm_data['value'],$frm_data['toggle_status']];
-
-   if(update($q,$v,'ii')){
-      echo 1;
-   }
-   else{
-      echo 0;
-   }
-
-}
-
-if(isset($_POST['add_image'])){
-   $frm_data = filteration($_POST);
-  
-   $img_r = uploadImage($_FILES['image'], ROOMS_FOLDER);
-
-   if($img_r == 'inv_img'){
-       http_response_code(400); // Bad request
-       header('Content-Type: application/json');
-       echo json_encode(['error' => 'inv_img']);
-   } else if($img_r == 'inv_size'){
-       http_response_code(400); // Bad request
-       header('Content-Type: application/json');
-       echo json_encode(['error' => 'inv_size']);
-   } else if($img_r == 'upd_failed'){
-       http_response_code(500); // Internal server error
-       header('Content-Type: application/json');
-       echo json_encode(['error' => 'upd_failed']);
-   } else {
-       $q = "INSERT INTO `room_images`(`room_id`, `image`) VALUES (?,?)";
-       $values = [$frm_data['room_id'], $img_r];
-       $res = insert($q, $values, 'is');
-       if ($res) {
-           header('Content-Type: application/json');
-           echo json_encode(['success' => 'Image uploaded successfully']);
-       } else {
-           http_response_code(500); // Internal server error
-           header('Content-Type: application/json');
-           echo json_encode(['error' => 'Database insertion failed']);
-       }
-   }
-}
-
-if(isset($_POST['get_room_images'])){
-   $frm_data = filteration($_POST);
-   $res = select("SELECT * FROM `room_images` WHERE `room_id`=?" , [$frm_data['get_room_images']],'i');
-
-   $path = ROOMS_IMG_PATH;
-   
-   // Set appropriate content type for HTML response
-   header('Content-Type: text/html');
-
-   while($row = mysqli_fetch_assoc($res)) {
-       echo<<<data
-           <tr class='align-middle'>
-           <td><img src='$path$row[image]' class='img-fluid'></td>
-           <td>thumb</td>
-           <td>delete</td>
-           </tr>
-       data;
-   }
-}
-
-
-
 ?>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Rooms</title>
+    <?php require('inc/links.php');
+    ?>
+</head>
+
+<body class="bg-light">
+
+    <?php require('inc/header.php'); ?>
+
+    <div class="container-fluid" id="main-content">
+        <div class="row">
+            <div class="col-lg-10 ms-auto p-4 overflow-hidden">
+                <h3 class="mb-4">ROOMS</h3>
+
+                <!--features -->
+
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+
+                        <div class="text-end mb-4">
+                            <button type="button" class="btn btn-dark shadow-none btn-sm" data-bs-toggle="modal" data-bs-target="#add-room">
+                                <i class="bi bi-plus-square"></i> Add
+                            </button>
+                        </div>
+
+
+
+                        <div class="table-responsive-lg" style="height:450px; overflow-y: scroll;">
+                            <table class="table table-hover border">
+                                <thead>
+                                    <tr class="bg-dark text-light">
+                                        <th scope="col">#</th>
+                                        <th scope="col">Name</th>
+                                        <th scope="col">Area</th>
+                                        <th scope="col">Guests</th>
+                                        <th scope="col">Price</th>
+                                        <th scope="col">Quantity</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="room-data">
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Add room modal -->
+
+    <div class="modal fade" id="add-room" data-bs-backdrop="static" data-bs-keyboard="true" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <form id="add_room_form" autocomplete="off">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Room</h5>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Name</label>
+                                <input type="text" name="name" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Area</label>
+                                <input type="number" min="1" name="area" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Price</label>
+                                <input type="number" min="1" name="price" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Quantity</label>
+                                <input type="number" min="1" name="quantity" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Adult (Max.)</label>
+                                <input type="number" min="1" name="adult" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Children (Max.)</label>
+                                <input type="number" min="1" name="children" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Features</label>
+                                <div class="row">
+                                    <?php
+                                    $res = selectAll('features');
+                                    while ($opt = mysqli_fetch_assoc($res)) {
+                                        echo "
+                                             <div class='col-md-3 mb-1'>
+                                                <label>
+                                                    <input type='checkbox' name='features' value='$opt[id]' class='form-check-input shadow-none'>
+                                                    $opt[name]
+                                                </label>
+                                             </div>
+                                         ";
+                                    }
+                                    ?>
+                                </div>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Facilities</label>
+                                <div class="row">
+                                    <?php
+                                    $res = selectAll('facilities');
+                                    while ($opt = mysqli_fetch_assoc($res)) {
+                                        echo "
+                                             <div class='col-md-3 mb-1'>
+                                                <label>
+                                                    <input type='checkbox' name='facilities' value='$opt[id]' class='form-check-input shadow-none'>
+                                                    $opt[name]
+                                                </label>
+                                             </div>
+                                           ";
+                                    }
+                                    ?>
+                                </div>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Description</label>
+                                <textarea name="desc" rows="4" class="form-control shadow-none" required></textarea>
+
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="reset" class="btn text-secondary shadow-none" data-bs-dismiss="modal">CANCEL</button>
+                        <button type="submit" class="btn custom-bg text-white shadow-none">SUBMIT</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!--edit room modal -->
+
+    <div class="modal fade" id="edit-room" data-bs-backdrop="static" data-bs-keyboard="true" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <form id="edit_room_form" autocomplete="off">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Room</h5>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Name</label>
+                                <input type="text" name="name" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Area</label>
+                                <input type="number" min="1" name="area" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Price</label>
+                                <input type="number" min="1" name="price" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Quantity</label>
+                                <input type="number" min="1" name="quantity" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Adult (Max.)</label>
+                                <input type="number" min="1" name="adult" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Children (Max.)</label>
+                                <input type="number" min="1" name="children" class="form-control shadow-none" required>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Features</label>
+                                <div class="row">
+                                    <?php
+                                    $res = selectAll('features');
+                                    while ($opt = mysqli_fetch_assoc($res)) {
+                                        echo "
+                                             <div class='col-md-3 mb-1'>
+                                                <label>
+                                                    <input type='checkbox' name='features' value='$opt[id]' class='form-chech-input shadow-none'>
+                                                    $opt[name]
+                                                </label>
+                                             </div>
+                                         ";
+                                    }
+                                    ?>
+                                </div>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Facilities</label>
+                                <div class="row">
+                                    <?php
+                                    $res = selectAll('facilities');
+                                    while ($opt = mysqli_fetch_assoc($res)) {
+                                        echo "
+                                             <div class='col-md-3 mb-1'>
+                                                <label>
+                                                    <input type='checkbox' name='facilities' value='$opt[id]' class='form-chech-input shadow-none'>
+                                                    $opt[name]
+                                                </label>
+                                             </div>
+                                           ";
+                                    }
+                                    ?>
+                                </div>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Description</label>
+                                <textarea name="desc" rows="4" class="form-control shadow-none" required></textarea>
+
+                            </div>
+                            <input type="hidden" name="room_id">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="reset" class="btn text-secondary shadow-none" data-bs-dismiss="modal">CANCEL</button>
+                        <button type="submit" class="btn custom-bg text-white shadow-none">SUBMIT</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!--Manage room images modal -->
+    <div class="modal fade" id="room-images" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Room Name</h5>
+                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="image-alert"></div>
+                    <div class="border-bottom border-3 pb-3 mb-3">
+                        <form id="add_image_form">
+                            <label class="form-label fw-bold">Add Image</label>
+                            <input type="file" name="image" accept=".jpg, .png, .webp, .jpeg" class="form-control shadow-none mb-3" required>
+                           <!-- <button class="btn custom-bg text-white shadow-none">ADD</button>-->
+                            <input type="hidden" name="room_id">
+                        </form>
+                    </div>
+
+                    <div class="table-responsive-lg" style="height:350px; overflow-y: scroll;">
+                        <table class="table table-hover border">
+                            <thead>
+                                <tr class="bg-dark text-light sticky-top">
+                                    <th scope="col" width="60%">Image</th>
+                                    <th scope="col">Thumb</th>
+                                    <th scope="col">Delete</th>
+
+                                </tr>
+                            </thead>
+                            <tbody id="room-image-data">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <?php require('inc/scripts.php'); ?>
+    <script src="scripts/rooms.js"></script>
+
+</body>
+
+</html>

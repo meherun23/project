@@ -1,109 +1,72 @@
 <?php
-
-require('../inc/db_config.php');
-require('../inc/essentials.php');
+require('inc/essentials.php');
+require('inc/db_config.php');
 adminLogin();
-
-if(isset($_POST['get_users']))
-{
-   $res = selectAll('user_cred');
-   $i=1;
-
-   $data = "";
-
-   while($row = mysqli_fetch_assoc($res))
-   {
-
-
-        $status = "<button onclick='toggle_status($row[id],0)' class='btn btn-dark btn-sm shadow-none'>active</button>";
-
-
-        if(!$row['status'])
-        {
-            $status = "<button onclick='toggle_status($row[id],1)' class='btn btn-danger btn-sm shadow-none'>inactive</button>";
-        }
-
-        $date = date("d-m-Y",strtotime($row['datentime']));
-
-      $data.="
-        <tr>
-          <td>$i</td>
-          <td>
-              $row[name]
-          </td>
-          <td>$row[email]</td>
-          <td>$row[phonenum]</td>
-          <td>$row[address]</td>
-          <td>$row[dob]</td>
-          <td>$status</td>
-          <td>$date</td>
-        </tr>
-      ";
-      $i++;
-   }
-   echo $data;
-   
-}
-
-if(isset($_POST['toggle_status']))
-{
-   $frm_data = filteration($_POST);
-
-   $q = "UPDATE `user_cred` SET `status`=? WHERE `id`=?";
-   $v = [$frm_data['value'],$frm_data['toggle_status']];
-
-   if(update($q,$v,'ii')){
-      echo 1;
-   }
-   else{
-      echo 0;
-   }
-
-}
-
-if(isset($_POST['search_user']))
-{
-   $frm_data = filteration($_POST);
-   $query = "SELECT * FROM `user_cred` WHERE `name` LIKE ?";
-   $res = select($query,["%$frm_data[name]%"],'s');
-   $i=1;
-
-   $data = "";
-
-   while($row = mysqli_fetch_assoc($res))
-   {
-
-        $status = "<button onclick='toggle_status($row[id],0)' class='btn btn-dark btn-sm shadow-none'>active</button>";
-
-
-        if(!$row['status'])
-        {
-            $status = "<button onclick='toggle_status($row[id],1)' class='btn btn-danger btn-sm shadow-none'>inactive</button>";
-        }
-
-        $date = date("d-m-Y",strtotime($row['datentime']));
-
-      $data.="
-        <tr>
-          <td>$i</td>
-          <td>
-              $row[name]
-          </td>
-          <td>$row[email]</td>
-          <td>$row[phonenum]</td>
-          <td>$row[address]</td>
-          <td>$row[dob]</td>
-          <td>$status</td>
-          <td>$date</td>
-        </tr>
-      ";
-      $i++;
-   }
-   echo $data;
-   
-}
-
-
 
 
 ?>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Users</title>
+    <?php require('inc/links.php');
+    ?>
+</head>
+
+<body class="bg-light">
+
+    <?php require('inc/header.php'); ?>
+
+    <div class="container-fluid" id="main-content">
+        <div class="row">
+            <div class="col-lg-10 ms-auto p-4 overflow-hidden">
+                <h3 class="mb-4">USERS</h3>
+
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+
+                        <div class="text-end mb-4">
+                           <input type="text" oninput="search_user(this.value)" class="form-control shadow-none w-25 ms-auto" placeholder="Type to search.">
+                        </div>
+
+
+
+                        <div class="table-responsive">
+                            <table class="table table-hover border text-center" style="min-width: 1300px;">
+                                <thead>
+                                    <tr class="bg-dark text-light">
+                                        <th scope="col">#</th>
+                                        <th scope="col">Name</th>
+                                        <th scope="col">Email</th>
+                                        <th scope="col">Phone no.</th>
+                                        <th scope="col">Location</th>
+                                        <th scope="col">DOB</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Date</th>
+                                      
+                                    </tr>
+                                </thead>
+                                <tbody id="users-data">
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <?php require('inc/scripts.php'); ?>
+
+    <script src="scripts/users.js"></script>
+
+</body>
+
+</html>
