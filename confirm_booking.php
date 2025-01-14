@@ -1,60 +1,208 @@
-<?php 
-require('../admin/inc/db_config.php');
-require('../admin/inc/essentials.php');
+<!DOCTYPE html>
+<html lang="en">
 
-date_default_timezone_get();
-if(isset($_POST['check_availibility']))
-{
-    $frm_data = filteration($_POST);
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php require('inc/links.php'); ?>
 
-    $status = "";
-    $result = "";
+    <title><?php echo $settings_r['site_title'] ?> - CONFIRM BOOKING </title>
+</head>
 
-    // check in and check out validation
+<body class="bg-light">
 
-    $today_date = new DateTime(date("Y-m-d"));
-    $checkin_date = new DateTime($frm_data['check_in']);
-    $checkout_date = new DateTime($frm_data['check_out']);
+    <?php require('inc/header.php'); ?>
 
-    if($checkin_date == $checkout_date){
-        $status = 'check_in_out_equal';
-        $result = json_encode(["status"=>$status]);
-    }
-    else if($checkout_date < $checkin_date){
-        $status = 'check_out_earlier';
-        $result = json_encode(["status"=>$status]);
-    }
-    else if($checkin_date < $today_date){
-        $status = 'check_in_earlier';
-        $result = json_encode(["status"=>$status]);
+    <?php
+
+    if (!isset($_GET['id'])) {
+        redirect('rooms.php');
+    } else if (!(isset($_SESSION['login']) && $_SESSION['login'] == true)) {
+        redirect('rooms.php');
     }
 
-    // check booking availibility
+    $data = filteration($_GET);
 
-    if($status!=''){
+    $room_res = select("SELECT * FROM `rooms` WHERE `id`=? AND `status`=?", [$data['id'], 1], 'ii');
 
-        echo $result;
-    }
-    else{
-        session_start();
-        $_SESSION['room'];
-
-        //  run query to check rooms availibility
-
-        $count_days= date_diff($checkin_date,$checkout_date)->days;
-        $payment = $_SESSION['room']['price'] * $count_days;
-
-        $_SESSION['room']['payment'] = $payment;
-        $_SESSION['room']['available'] = true;
-
-        $result = json_encode(["status"=>'available', "days"=>$count_days, "payment"=> $payment]);
-        echo $result;
-
-
-
+    if (mysqli_num_rows($room_res) == 0) {
+        redirect('rooms.php');
     }
 
+    $room_data = mysqli_fetch_assoc($room_res);
 
-}
+    $_SESSION['room'] = [
+        "id" => $room_data['id'],
+        "name" => $room_data['name'],
+        "price" => $room_data['price'],
+        "payment" => null,
+        "available" => false,
+    ];
 
-?>
+    $user_res = select("SELECT * FROM `user_cred` WHERE `id`=? LIMIT 1", [$_SESSION['uId']], "i");
+    $user_data = mysqli_fetch_assoc($user_res);
+
+
+
+    ?>
+
+
+
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <div class="col-12 my-5 mb-4 px-4">
+                <h2 class="fw-bold">CONFIRM BOOKING</h2>
+                <div style="font-size: 14px;">
+                    <a href="index.php" class="text-secondary text-decoration-none">HOME</a>
+                    <span class="text-secondary"> > </span>
+                    <a href="index.php" class="text-secondary text-decoration-none">ROOMS</a>
+                    <span class="text-secondary"> > </span>
+                    <a href="#" class="text-secondary text-decoration-none">CONFIRM</a>
+                </div>
+            </div>
+
+            <div class="col-lg-7 col-md-12 px-4">
+
+
+                <?php
+
+                echo <<<data
+                        <div class="card p-3 shadow-sm rounded">
+                        
+                            
+                                <img src="images/Rooms/main.jpg" class="img-fluid rounded mb-3">
+                        
+
+                                <h5>$room_data[name]</h5>
+                                <h6>৳$room_data[price] per night</h6>
+
+                        </div>
+                data;
+
+                ?>
+
+
+            </div>
+
+            <div class="col-lg-5 col-md-12 px-4">
+                <div class="card mb-4 border-0 shadow-sm rounded-3">
+                    <div class="card-body">
+                        <form action="#" id="booking_form">
+                            <h6 class="mb-3">BOOKING DETAILS</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input name="name" type="text" value="<?php echo $user_data['name'] ?>" class="form-control shadow-none" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Phone number</label>
+                                    <input name="phonenum" type="number" value="<?php echo $user_data['phonenum'] ?>" class="form-control shadow-none" required>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Address</label>
+                                    <textarea name="address" class="form-control shadow-none" rows="1" required><?php echo $user_data['address'] ?></textarea>
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label">Check-in</label>
+                                    <input name="checkin" onchange="check_availability()" type="date" class="form-control shadow-none" required>
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label">Check-out</label>
+                                    <input name="checkout" onchange="check_availability()" type="date" class="form-control shadow-none" required>
+                                </div>
+                                <div class="col-12">
+                                   <!-- <div class="spinner-border text-info mb-3 d-none" id="info_loader" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                   <h6 class="mb-3 text-danger" id="pay_info">Provide check-in & check-out!</h6>
+                                <a href="confirmatiom.php" class="btn w-100 text-white custom-bg shadow-none mb-1" disabled > Confirm </a>
+                                 <button name="pay_now" class="btn w-100 text-white custom-bg shadow-none mb-1" > Confirm </button>-->
+                                 <h6 class="mb-3 text-danger" id="pay_info">Provide check-in & check-out!</h6>
+                                 <button name="pay_now" class="btn w-100 text-white custom-bg shadow-none mb-1"  > Confirm </button>
+                                 
+                                </div>
+                            </div>
+
+                        </form>
+
+                    </div>
+
+                </div>
+            </div>
+
+
+
+
+
+
+        </div>
+    </div>
+
+    <?php require('inc/footer.php'); ?>
+
+    <script>
+        let booking_form = document.getElementById('booking_form');
+        let info_loader = document.getElementById('info_loader');
+        let pay_info = document.getElementById('pay_info');
+
+
+        function check_availability() {
+            let checkin_val = booking_form.elements['checkin'].value;
+            let checkout_val = booking_form.elements['checkout'].value;
+
+         // booking_form.elements['pay_now'].setAttribute('disabled', true);
+
+            if (checkin_val != '' && checkout_val != '') {
+
+                pay_info.classList.add('d-none');
+                pay_info.classList.replace('text-dark', 'text-danger');
+
+            info_loader.classList.remove('d-none');
+
+
+                let data = new FormData();
+
+                data.append('check_availability', '');
+                data.append('check_in', checkin_val);
+                data.append('check_out', checkout_val);
+
+                let xhr = new XMLHttpRequest();
+                xhr.open("POST", "ajax/confirm_booking.php", true);
+
+                xhr.onload = function() {
+                    console.log(this.responseText); // Log the response content
+                    let data = JSON.parse(this.responseText);
+                    if (data.status == 'check_in_out_equal') {
+                        pay_info.innerText = "You cannot check-out on same day!";
+                    } else if (data.status == 'check_out_earlier') {
+                        pay_info.innerText = "Check-out date is earlier than check-in date!";
+                    } else if (data.status == 'check_in_earlier') {
+                        pay_info.innerText = "Check-in date is earlier than today's date!";
+                    } else if (data.status == 'unavailable') {
+                        pay_info.innerText = "Room not available for this check-in date!";
+                    } else {
+                        pay_info.innerHTML = "No. of days: " + data.days + "<br>Total Amount to pay: ৳" + data.payment;
+                        pay_info.classList.replace('text-danger', 'text-dark');
+                        booking_form.elements['pay_now'].removeAttribute('disabled');
+
+                    }
+                  
+
+                }
+
+                xhr.send(data);
+
+
+            }
+            pay_info.classList.add('d-none');
+                pay_info.classList.replace('text-dark', 'text-danger');
+
+
+        }
+    </script>
+
+</body>
+
+</html>
